@@ -23,7 +23,7 @@ import threading
 import collections
 import random
 
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 from fedlearner.data_join.data_block_visitor import DataBlockVisitor
 
 kvstore_type = os.environ.get('KVSTORE_TYPE', 'etcd')

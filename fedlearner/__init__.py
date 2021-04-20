@@ -13,9 +13,3 @@
 # limitations under the License.
 
 # coding: utf-8
-"""All public modules of FedLearner."""
-
-from fedlearner import common
-from fedlearner import data_join
-from fedlearner import proxy
-from fedlearner import trainer

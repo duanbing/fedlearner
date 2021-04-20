@@ -21,7 +21,7 @@ import logging
 import threading
 import time
 
-import tensorflow.compat.v1 as tf
+import tensorflow as tf
 from google.protobuf import any_pb2 as any_pb
 from fedlearner.channel import Channel
 from fedlearner.common import common_pb2 as common_pb
@@ -94,7 +94,7 @@ class Bridge(object):
 
         # supervise
         self._supervise_interval = 5
-        self._supervise_iteration_timeout = 1200
+        self._supervise_iteration_timeout = 0
 
     def _channel_callback(self, channel, event):
         if event == Channel.Event.PEER_CLOSED:
@@ -424,7 +424,7 @@ class Bridge(object):
         def func(x):
             self.send(name, x)
 
-        return tf.py_function(func=func, inp=[x], Tout=[], name='send_'+name)
+        return tf.py_func(func=func, inp=[x], Tout=[], name='send_'+name)
 
     def _receive(self, name):
         start_time = time.time()
@@ -473,6 +473,6 @@ class Bridge(object):
 
     def receive_op(self, name, dtype):
         def func():
-            return tf.convert_to_tensor(self.receive(name), dtype=dtype)
+            return self.receive(name)
 
-        return tf.py_function(func=func, inp=[], Tout=dtype, name='recv_'+name)
+        return tf.py_func(func=func, inp=[], Tout=dtype, name='recv_'+name)
