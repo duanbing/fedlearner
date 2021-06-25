@@ -15,6 +15,7 @@
 # coding: utf-8
 
 import time
+import os
 import uuid
 import logging
 import threading
@@ -23,7 +24,7 @@ from concurrent import futures
 import grpc
 
 from fedlearner.channel import channel_pb2, channel_pb2_grpc
-from fedlearner.proxy.channel import make_insecure_channel, ChannelType
+from fedlearner.proxy.channel import make_secure_channel, ChannelType
 from fedlearner.channel.client_interceptor import ClientInterceptor
 from fedlearner.channel.server_interceptor import ServerInterceptor
 
@@ -171,7 +172,7 @@ class Channel():
 
         # channel
         self._remote_address = remote_address
-        self._channel = make_insecure_channel(
+        self._channel = make_secure_channel(
             self._remote_address,
             mode=ChannelType.REMOTE,
             options=(
@@ -195,6 +196,19 @@ class Channel():
         self._server_thread_pool = futures.ThreadPoolExecutor(
             max_workers=max_workers)
         self._server_interceptor = ServerInterceptor()
+
+        base_dir=os.environ.get('CERT_BASE_DIR', "")
+        with open(os.path.join(base_dir, 'userkey.pem'), 'rb') as f:
+            private_key = f.read()
+        with open(os.path.join(base_dir, 'usercert.pem'), 'rb') as f:
+            certificate_chain = f.read()
+        with open(os.path.join(base_dir, '../demoCA/cacert.pem'), 'rb') as f:
+            root_certificates = f.read()
+        print(root_certificates)
+
+        server_credentials = grpc.ssl_server_credentials(
+            ((private_key, certificate_chain) ,), root_certificates, True)
+
         self._server = grpc.server(
             self._server_thread_pool,
             options=(
@@ -203,7 +217,9 @@ class Channel():
             ),
             interceptors=(self._server_interceptor,),
             compression=compression)
-        self._server.add_insecure_port(self._listen_address)
+        #self._server.add_insecure_port(self._listen_address)
+        print(self._listen_address)
+        self._server.add_secure_port(self._listen_address, server_credentials)
 
         # channel client & server
         self._channel_call = channel_pb2_grpc.ChannelStub(self._channel)

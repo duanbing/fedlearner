@@ -141,3 +141,49 @@ def make_insecure_channel(address,
         return grpc.insecure_channel(address, options, compression)
 
     raise Exception("UNKNOWN Channel by uuid %s" % address)
+
+def get_creds():
+    base_dir=os.environ.get('CERT_BASE_DIR', "")
+    with open(os.path.join(base_dir, 'userkey.pem'), 'rb') as f:
+        private_key = f.read()
+    with open(os.path.join(base_dir, 'usercert.pem'), 'rb') as f:
+        certificate_chain = f.read()
+    with open(os.path.join(base_dir, '../demoCA/cacert.pem'), 'rb') as f:
+        root_certificates = f.read()
+
+    creds = grpc.ssl_channel_credentials(root_certificates, private_key, certificate_chain)
+    return creds
+
+def make_secure_channel(address,
+                        mode=ChannelType.INTERNAL,
+                        options=None,
+                        compression=None):
+    creds = get_creds()
+    if check_address_valid(address):
+        return grpc.secure_channel(address, creds, options, compression)
+
+    if mode == ChannelType.REMOTE:
+        if not EGRESS_URL:
+            logging.error("EGRESS_URL is invalid,"
+                          "not found in environment variable.")
+            return grpc.secure_channel(address, creds, options, compression)
+
+        options = list(options) if options else list()
+
+        logging.debug("EGRESS_URL is [%s]", EGRESS_URL)
+        if EGRESS_HOST:
+            options.append(('grpc.default_authority', EGRESS_HOST))
+            if EGRESS_DOMAIN:
+                address = address + '.' + EGRESS_DOMAIN
+            header_adder = header_adder_interceptor('x-host', address)
+            channel = grpc.secure_channel(
+                EGRESS_URL, creds, options, compression)
+            return grpc.intercept_channel(channel, header_adder)
+
+        options.append(('grpc.default_authority', address))
+        return grpc.secure_channel(EGRESS_URL, creds, options, compression)
+
+    if mode == ChannelType.INTERNAL:
+        return grpc.secure_channel(address, creds, options, compression)
+
+    raise Exception("UNKNOWN Channel by uuid %s" % address)
